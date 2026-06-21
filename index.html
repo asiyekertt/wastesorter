@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Waste Sorting AI | EcoLogic</title>
+
+  <!-- TensorFlow.js + Teachable Machine Image Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #eef8f1;
+      --card: #ffffff;
+      --text: #173b2f;
+      --muted: #627a70;
+      --primary: #1c8f5a;
+      --primary-dark: #116d43;
+      --warning: #e68a00;
+      --danger: #b42318;
+      --line: #d8eadf;
+      --shadow: 0 18px 45px rgba(18, 84, 52, 0.14);
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(64, 190, 124, 0.18), transparent 32%),
+        linear-gradient(135deg, #eef8f1 0%, #f8fff9 45%, #e8f5ee 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .page {
+      width: min(1180px, 94vw);
+      margin: 0 auto;
+      padding: 34px 0 46px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: fit-content;
+      margin: 0 auto;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(28, 143, 90, 0.12);
+      color: var(--primary-dark);
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(32px, 5vw, 58px);
+      line-height: 1.04;
+      letter-spacing: -1.5px;
+    }
+
+    .subtitle {
+      margin: 0 auto;
+      max-width: 760px;
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-body {
+      padding: 22px;
+    }
+
+    .setup {
+      margin-bottom: 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .url-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid #c9dfd1;
+      background: #fbfffc;
+      color: var(--text);
+      border-radius: 14px;
+      padding: 13px 14px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(28, 143, 90, 0.12);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .camera-wrap {
+      position: relative;
+      overflow: hidden;
+      border-radius: 20px;
+      background: #0e2019;
+      min-height: 410px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    video {
+      width: 100%;
+      max-height: 530px;
+      object-fit: cover;
+      transform: scaleX(-1);
+      display: none;
+    }
+
+    .camera-placeholder {
+      color: rgba(255, 255, 255, 0.86);
+      text-align: center;
+      padding: 28px;
+    }
+
+    .camera-placeholder .icon {
+      font-size: 70px;
+      margin-bottom: 12px;
+    }
+
+    .camera-placeholder p {
+      margin: 6px 0 0;
+      color: rgba(255, 255, 255, 0.65);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 14px;
+      padding: 13px 16px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.12s ease, background 0.12s ease;
+      font-size: 15px;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-dark);
+    }
+
+    .btn-secondary {
+      background: #e5f4eb;
+      color: var(--primary-dark);
+    }
+
+    .btn-danger {
+      background: #ffe7e2;
+      color: var(--danger);
+    }
+
+    .result-card {
+      display: grid;
+      gap: 16px;
+    }
+
+    .result-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 18px;
+    }
+
+    .result-title {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .confidence {
+      font-weight: 900;
+      color: var(--primary-dark);
+      background: #e5f4eb;
+      border-radius: 999px;
+      padding: 8px 12px;
+      min-width: 78px;
+      text-align: center;
+    }
+
+    .detected {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .detected-icon {
+      width: 82px;
+      height: 82px;
+      border-radius: 24px;
+      display: grid;
+      place-items: center;
+      font-size: 42px;
+      background: #e8f7ee;
+    }
+
+    .detected h2 {
+      margin: 0 0 6px;
+      font-size: 32px;
+      letter-spacing: -0.5px;
+    }
+
+    .detected p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .instruction {
+      padding: 16px;
+      border-radius: 18px;
+      background: #f5fbf7;
+      border: 1px dashed #b8d9c5;
+      color: var(--text);
+      line-height: 1.55;
+      font-weight: 700;
+    }
+
+    .predictions {
+      display: grid;
+      gap: 11px;
+    }
+
+    .prediction-item {
+      display: grid;
+      gap: 7px;
+    }
+
+    .prediction-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .bar {
+      height: 12px;
+      border-radius: 999px;
+      background: #edf5f0;
+      overflow: hidden;
+      border: 1px solid #d7e8dd;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #78c995, #1c8f5a);
+      border-radius: 999px;
+      transition: width 0.2s ease;
+    }
+
+    .waste-guide {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+    }
+
+    .guide-item {
+      background: rgba(255,255,255,0.78);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px 10px;
+      text-align: center;
+    }
+
+    .guide-item .emoji {
+      font-size: 30px;
+      margin-bottom: 6px;
+    }
+
+    .guide-item strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .guide-item small {
+      color: var(--muted);
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+    }
+
+    .status {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      min-height: 20px;
+    }
+
+    footer {
+      margin-top: 22px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 920px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .waste-guide {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .url-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .card-body {
+        padding: 16px;
+      }
+      .camera-wrap {
+        min-height: 320px;
+      }
+      .detected {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+      .detected-icon {
+        margin: 0 auto;
+      }
+      .waste-guide {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="badge">🌍 EcoLogic: AI Thinking for a Greener World</div>
+      <h1>Waste Sorting AI</h1>
+      <p class="subtitle">
+        Show a waste item to the camera. The AI model will try to classify it as paper, plastic, organic waste, metal, or battery waste.
+      </p>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <div class="card-body">
+          <div class="setup">
+            <label for="modelUrl">Teachable Machine Model URL</label>
+            <div class="url-row">
+              <input
+                id="modelUrl"
+                type="text"
+                placeholder="Paste your model link, e.g. https://teachablemachine.withgoogle.com/models/XXXX/"
+              />
+              <button class="btn-secondary" id="loadModelBtn">Load Model</button>
+            </div>
+            <div class="hint">
+              Train your model with these classes: <strong>Paper, Plastic, Organic, Metal, Battery</strong>. Turkish labels such as “Kağıt, Plastik, Organik, Metal, Pil” are also supported.
+            </div>
+          </div>
+
+          <div class="camera-wrap">
+            <video id="webcam" autoplay playsinline muted></video>
+            <div class="camera-placeholder" id="cameraPlaceholder">
+              <div class="icon">📷</div>
+              <strong>Camera is not active</strong>
+              <p>Load a model and start the camera.</p>
+            </div>
+          </div>
+
+          <div class="controls">
+            <button class="btn-primary" id="startBtn" disabled>Start Camera</button>
+            <button class="btn-danger" id="stopBtn" disabled>Stop Camera</button>
+          </div>
+
+          <div class="status" id="status">Model not loaded yet.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body result-card">
+          <div class="result-top">
+            <h2 class="result-title">Live Result</h2>
+            <div class="confidence" id="confidence">0%</div>
+          </div>
+
+          <div class="detected">
+            <div class="detected-icon" id="detectedIcon">♻️</div>
+            <div>
+              <h2 id="detectedName">Waiting...</h2>
+              <p id="detectedDesc">The AI result will appear here after the camera starts.</p>
+            </div>
+          </div>
+
+          <div class="instruction" id="instruction">
+            Point the camera at one clear waste item. Good lighting improves prediction quality.
+          </div>
+
+          <div class="predictions" id="predictions"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="waste-guide" aria-label="Waste sorting guide">
+      <div class="guide-item"><div class="emoji">📄</div><strong>Paper</strong><small>Paper bin</small></div>
+      <div class="guide-item"><div class="emoji">🧴</div><strong>Plastic</strong><small>Plastic recycling</small></div>
+      <div class="guide-item"><div class="emoji">🍌</div><strong>Organic</strong><small>Compost / organic bin</small></div>
+      <div class="guide-item"><div class="emoji">🥫</div><strong>Metal</strong><small>Metal recycling</small></div>
+      <div class="guide-item"><div class="emoji">🔋</div><strong>Battery</strong><small>Battery collection point</small></div>
+    </section>
+
+    <footer>
+      This student AI tool is for learning and awareness. AI can make mistakes, so always check local recycling rules.
+    </footer>
+  </main>
+
+  <script>
+    // Optional: paste your default model URL here so users do not need to enter it manually.
+    // Example: const DEFAULT_MODEL_URL = "https://teachablemachine.withgoogle.com/models/abc123/";
+    const DEFAULT_MODEL_URL = "";
+
+    const CONFIDENCE_THRESHOLD = 0.70;
+
+    const wasteInfo = {
+      paper: {
+        name: "Paper",
+        icon: "📄",
+        description: "Paper waste includes newspapers, notebooks, cardboard, and clean paper packaging.",
+        instruction: "Put it in the paper recycling bin. Keep paper clean and dry before recycling."
+      },
+      plastic: {
+        name: "Plastic",
+        icon: "🧴",
+        description: "Plastic waste includes bottles, plastic containers, bags, and packaging materials.",
+        instruction: "Put it in the plastic recycling bin. Empty and clean containers when possible."
+      },
+      organic: {
+        name: "Organic",
+        icon: "🍌",
+        description: "Organic waste includes fruit peels, food leftovers, leaves, and other biodegradable materials.",
+        instruction: "Put it in the organic waste bin or compost area if available."
+      },
+      metal: {
+        name: "Metal",
+        icon: "🥫",
+        description: "Metal waste includes cans, tins, foil, and small metal packaging.",
+        instruction: "Put it in the metal recycling bin. Empty and rinse cans before recycling."
+      },
+      battery: {
+        name: "Battery",
+        icon: "🔋",
+        description: "Battery waste can contain harmful chemicals and should not be thrown into regular trash.",
+        instruction: "Take it to a battery collection point or an authorized recycling box."
+      },
+      unknown: {
+        name: "Uncertain",
+        icon: "❔",
+        description: "The model is not confident enough yet.",
+        instruction: "Move the item closer, improve lighting, and show only one waste item at a time."
+      }
+    };
+
+    const aliases = {
+      paper: ["paper", "cardboard", "carton", "kagit", "kağıt", "kağit", "karton"],
+      plastic: ["plastic", "plastik", "pet", "bottle", "sise", "şişe", "plastics"],
+      organic: ["organic", "organik", "food", "compost", "bio", "biowaste", "biodegradable", "gida", "gıda"],
+      metal: ["metal", "metals", "can", "tin", "aluminum", "aluminium", "aluminyum", "teneke"],
+      battery: ["battery", "batteries", "pil", "piller", "accumulator", "hazardous"]
+    };
+
+    let model = null;
+    let maxPredictions = 0;
+    let stream = null;
+    let animationId = null;
+    let isPredicting = false;
+
+    const modelUrlInput = document.getElementById("modelUrl");
+    const loadModelBtn = document.getElementById("loadModelBtn");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const statusEl = document.getElementById("status");
+    const video = document.getElementById("webcam");
+    const placeholder = document.getElementById("cameraPlaceholder");
+    const confidenceEl = document.getElementById("confidence");
+    const detectedIconEl = document.getElementById("detectedIcon");
+    const detectedNameEl = document.getElementById("detectedName");
+    const detectedDescEl = document.getElementById("detectedDesc");
+    const instructionEl = document.getElementById("instruction");
+    const predictionsEl = document.getElementById("predictions");
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const savedUrl = localStorage.getItem("wasteSortingModelUrl") || DEFAULT_MODEL_URL;
+      if (savedUrl) modelUrlInput.value = savedUrl;
+    });
+
+    loadModelBtn.addEventListener("click", loadModel);
+    startBtn.addEventListener("click", startCamera);
+    stopBtn.addEventListener("click", stopCamera);
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function normalizeText(text) {
+      return (text || "")
+        .toString()
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9ğüşıöç\s_-]/gi, " ")
+        .replace(/\s+/g, " ");
+    }
+
+    function normalizeModelUrl(url) {
+      let clean = (url || "").trim();
+      if (!clean) return "";
+      clean = clean.replace("model.json", "").replace("metadata.json", "");
+      if (!clean.endsWith("/")) clean += "/";
+      return clean;
+    }
+
+    function categoryFromLabel(label) {
+      const clean = normalizeText(label);
+      for (const [category, words] of Object.entries(aliases)) {
+        if (words.some(word => clean.includes(normalizeText(word)))) {
+          return category;
+        }
+      }
+      return clean || "unknown";
+    }
+
+    async function loadModel() {
+      try {
+        stopCamera();
+        setStatus("Loading model...");
+        loadModelBtn.disabled = true;
+        startBtn.disabled = true;
+
+        const baseUrl = normalizeModelUrl(modelUrlInput.value);
+        if (!baseUrl) {
+          throw new Error("Please paste a Teachable Machine model URL first.");
+        }
+
+        const modelURL = baseUrl + "model.json";
+        const metadataURL = baseUrl + "metadata.json";
+
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+        localStorage.setItem("wasteSortingModelUrl", baseUrl);
+
+        renderEmptyPredictions(maxPredictions);
+        startBtn.disabled = false;
+        setStatus("Model loaded. You can start the camera now.");
+      } catch (error) {
+        console.error(error);
+        setStatus("Model could not be loaded: " + error.message);
+      } finally {
+        loadModelBtn.disabled = false;
+      }
+    }
+
+    async function startCamera() {
+      if (!model) {
+        setStatus("Please load a model first.");
+        return;
+      }
+
+      try {
+        setStatus("Requesting camera access...");
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment",
+            width: { ideal: 720 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        await video.play();
+        video.style.display = "block";
+        placeholder.style.display = "none";
+
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        setStatus("Camera is active. Show a waste item to the camera.");
+
+        loop();
+      } catch (error) {
+        console.error(error);
+        setStatus("Camera could not be started. Please allow camera access and use HTTPS or localhost.");
+      }
+    }
+
+    function stopCamera() {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+
+      video.pause();
+      video.srcObject = null;
+      video.style.display = "none";
+      placeholder.style.display = "grid";
+      isPredicting = false;
+
+      if (model) {
+        startBtn.disabled = false;
+      }
+      stopBtn.disabled = true;
+    }
+
+    async function loop() {
+      if (!stream || !model) return;
+
+      if (!isPredicting) {
+        isPredicting = true;
+        await predict();
+        isPredicting = false;
+      }
+
+      animationId = requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+      try {
+        const prediction = await model.predict(video, false);
+        const sorted = prediction.sort((a, b) => b.probability - a.probability);
+        updateResult(sorted);
+        updatePredictionBars(sorted);
+      } catch (error) {
+        console.error(error);
+        setStatus("Prediction error: " + error.message);
+      }
+    }
+
+    function updateResult(predictions) {
+      const top = predictions[0];
+      const confidence = top ? top.probability : 0;
+      const category = confidence >= CONFIDENCE_THRESHOLD ? categoryFromLabel(top.className) : "unknown";
+      const info = wasteInfo[category] || {
+        name: top.className,
+        icon: "♻️",
+        description: "This class was detected by your Teachable Machine model.",
+        instruction: "Check your local recycling rules before sorting this item."
+      };
+
+      confidenceEl.textContent = Math.round(confidence * 100) + "%";
+      detectedIconEl.textContent = info.icon;
+      detectedNameEl.textContent = info.name;
+      detectedDescEl.textContent = info.description;
+      instructionEl.textContent = info.instruction;
+    }
+
+    function renderEmptyPredictions(count) {
+      predictionsEl.innerHTML = "";
+      for (let i = 0; i < count; i++) {
+        const item = document.createElement("div");
+        item.className = "prediction-item";
+        item.innerHTML = `
+          <div class="prediction-label"><span>Class ${i + 1}</span><span>0%</span></div>
+          <div class="bar"><span></span></div>
+        `;
+        predictionsEl.appendChild(item);
+      }
+    }
+
+    function updatePredictionBars(predictions) {
+      predictionsEl.innerHTML = "";
+      predictions.forEach(pred => {
+        const percentage = Math.round(pred.probability * 100);
+        const item = document.createElement("div");
+        item.className = "prediction-item";
+        item.innerHTML = `
+          <div class="prediction-label"><span>${escapeHtml(pred.className)}</span><span>${percentage}%</span></div>
+          <div class="bar"><span style="width: ${percentage}%;"></span></div>
+        `;
+        predictionsEl.appendChild(item);
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
